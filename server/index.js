@@ -1,0 +1,264 @@
+import express from 'express';
+import cors from 'cors';
+import mongoose from 'mongoose';
+import 'dotenv/config';
+import { WebSocketServer } from 'ws';
+import { createServer } from 'http';
+import authRoutes from './routes/auth.js';
+import tenderRoutes from './routes/tenderRequests.js';
+import adminRoutes from './routes/admin.js';
+import contactRoutes from './routes/contact.js';
+import { createAdmin } from './utils/createAdmin.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { config } from './config.js';
+
+// Get directory name in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Create Express app
+const app = express();
+const server = createServer(app);
+const wss = new WebSocketServer({ server });
+
+const PORT = config.port;
+
+// WebSocket connections store
+const wsConnections = new Map();
+
+// WebSocket server setup
+wss.on('connection', (ws, req) => {
+  // Parse URL properly to handle query parameters
+  const urlParts = req.url.split('?')[0].split('/');
+  const channel = urlParts[1] || 'default';  // Get channel name without query params
+  console.log(`New WebSocket connection attempt on channel: ${channel}`);
+
+  // Store connection with error handling
+  try {
+    // Validate channel name - MUST match exactly with frontend channel names
+    const validChannels = ['DASHBOARD_STATS', 'TENDER_REQUESTS', 'WEBSITE_ANALYTICS'];
+    if (!validChannels.includes(channel)) {
+      console.error(`Invalid channel: ${channel}, valid channels are: ${validChannels.join(', ')}`);
+      ws.close(1008, 'Invalid channel');
+      return;
+    }
+
+    // Initialize channel if not exists
+    if (!wsConnections.has(channel)) {
+      wsConnections.set(channel, new Set());
+    }
+
+    // Add connection to channel
+    wsConnections.get(channel).add(ws);
+    console.log(`Client successfully connected to channel: ${channel}`);
+
+    // Send initial connection success message
+    ws.send(JSON.stringify({ 
+      type: 'CONNECTED', 
+      channel,
+      timestamp: new Date().toISOString()
+    }));
+
+    // Handle incoming messages
+    ws.on('message', (message) => {
+      try {
+        const data = JSON.parse(message);
+        
+        // Handle ping messages
+        if (data.type === 'PING') {
+          ws.send(JSON.stringify({ type: 'PONG', timestamp: new Date().toISOString() }));
+          ws.isAlive = true;
+          return;
+        }
+
+        // Handle authentication
+        if (data.type === 'AUTH') {
+          ws.isAuthenticated = true;
+          ws.send(JSON.stringify({ 
+            type: 'AUTH_SUCCESS',
+            timestamp: new Date().toISOString()
+          }));
+          return;
+        }
+      } catch (err) {
+        console.error('Error handling WebSocket message:', err);
+      }
+    });
+
+    // Handle client disconnect
+    ws.on('close', (code, reason) => {
+      console.log(`Client disconnected from channel: ${channel}, code: ${code}, reason: ${reason || 'No reason provided'}`);
+      wsConnections.get(channel)?.delete(ws);
+      if (wsConnections.get(channel)?.size === 0) {
+        wsConnections.delete(channel);
+        console.log(`Channel ${channel} removed as it has no connections`);
+      }
+    });
+
+    // Set up ping timeout
+    ws.isAlive = true;
+    ws.on('pong', () => {
+      ws.isAlive = true;
+    });
+
+  } catch (err) {
+    console.error('Error in WebSocket connection:', err);
+    ws.close(1011, 'Internal Server Error');
+  }
+});
+
+// Broadcast helper function
+export const broadcastToChannel = (channel, data) => {
+  if (wsConnections.has(channel)) {
+    wsConnections.get(channel).forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        try {
+          client.send(JSON.stringify(data));
+        } catch (error) {
+          console.error('Failed to send message to client:', error);
+        }
+      }
+    });
+  }
+};
+
+// Ping all clients every 30 seconds
+const pingInterval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.isAlive === false) {
+      console.log('Client not responding to ping, terminating connection');
+      return ws.terminate();
+    }
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 30000);
+
+wss.on('close', () => {
+  clearInterval(pingInterval);
+});
+
+// Middleware
+app.use(express.json());
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://localhost:5174', 'ws://localhost:5173', 'ws://localhost:5174', 'http://localhost:5000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  exposedHeaders: ['Content-Length', 'Content-Type']
+}));
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Database connection with retry logic and improved options
+const connectDB = async (retryCount = 0) => {
+  const MAX_RETRIES = 5;
+  try {
+    await mongoose.connect(config.mongodbUri, {
+      serverSelectionTimeoutMS: 60000,
+      socketTimeoutMS: 90000,
+      connectTimeoutMS: 60000,
+      maxPoolSize: 10,
+      retryWrites: true,
+      w: 'majority'
+    });
+    console.log('Connected to MongoDB');
+    createAdmin();
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    if (retryCount < MAX_RETRIES) {
+      console.log(`Retrying connection... Attempt ${retryCount + 1} of ${MAX_RETRIES}`);
+      setTimeout(() => connectDB(retryCount + 1), 5000 * Math.pow(2, retryCount));
+    } else {
+      console.error('Max retries reached. Could not connect to MongoDB.');
+      process.exit(1);
+    }
+  }
+};
+
+// Set up mongoose error handlers
+mongoose.connection.on('error', (err) => {
+  console.error('Mongoose connection error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('Mongoose disconnected. Attempting to reconnect...');
+  connectDB();
+});
+
+connectDB();
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/tender-requests', tenderRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/contact', contactRoutes);
+
+// Health check route
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok',
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({
+    message: 'Something went wrong!',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
+// Start server with retry logic
+const startServer = async (retryCount = 0) => {
+  const maxRetries = 3;
+  const alternativePorts = [5000, 5001, 5002, 5003];
+
+  try {
+    for (const port of alternativePorts) {
+      try {
+        await new Promise((resolve, reject) => {
+          server.listen(port, () => {
+            console.log(`Server running on port ${port}`);
+            console.log(`WebSocket server is ready`);
+            resolve();
+          }).on('error', (err) => {
+            if (err.code === 'EADDRINUSE') {
+              console.log(`Port ${port} is in use, trying next port...`);
+              server.close();
+              reject(err);
+            } else {
+              reject(err);
+            }
+          });
+        });
+        // If we get here, the server started successfully
+        return;
+      } catch (error) {
+        if (port === alternativePorts[alternativePorts.length - 1]) {
+          throw new Error('All ports are in use');
+        }
+        // Continue to next port
+        continue;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    if (retryCount < maxRetries) {
+      console.log(`Retrying in 5 seconds... (Attempt ${retryCount + 1} of ${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      return startServer(retryCount + 1);
+    } else {
+      console.error('Max retries reached. Could not start server.');
+      process.exit(1);
+    }
+  }
+};
+
+startServer();
+
+export default app;
