@@ -22,7 +22,7 @@ const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
-const PORT = config.port;
+const PORT = process.env.PORT || config.port;
 
 // WebSocket connections store
 const wsConnections = new Map();
@@ -142,10 +142,19 @@ wss.on('close', () => {
 // Middleware
 app.use(express.json());
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174', 'ws://localhost:5173', 'ws://localhost:5174', 'http://localhost:5000'],
+  origin: [
+    'http://localhost:5173', 
+    'http://localhost:5174', 
+    'ws://localhost:5173', 
+    'ws://localhost:5174', 
+    'http://localhost:5000',
+    'https://dhiya-frontend.vercel.app',
+    'https://dhiya-frontend.vercel.app/',
+    'https://*.vercel.app'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
   exposedHeaders: ['Content-Length', 'Content-Type']
 }));
 
@@ -196,62 +205,68 @@ app.use('/api/tender-requests', tenderRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/contact', contactRoutes);
 
-// Health check route
+// Health check routes (both /api/health and /health)
 app.get('/api/health', (req, res) => {
+  console.log('Health check requested from:', req.headers.origin);
   res.status(200).json({ 
     status: 'ok',
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/health', (req, res) => {
+  console.log('Health check requested from:', req.headers.origin);
+  res.status(200).json({ 
+    status: 'ok',
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Add a root route for testing
+app.get('/', (req, res) => {
+  console.log('Root route accessed from:', req.headers.origin);
+  res.status(200).json({ 
+    message: 'Server is running',
+    timestamp: new Date().toISOString()
   });
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err);
+  console.error('Request headers:', req.headers);
+  console.error('Request URL:', req.url);
   res.status(500).json({
     message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    timestamp: new Date().toISOString()
   });
 });
 
 // Start server with retry logic
 const startServer = async (retryCount = 0) => {
   const maxRetries = 3;
-  const alternativePorts = [5000, 5001, 5002, 5003];
-
   try {
-    for (const port of alternativePorts) {
-      try {
-        await new Promise((resolve, reject) => {
-          server.listen(port, () => {
-            console.log(`Server running on port ${port}`);
-            console.log(`WebSocket server is ready`);
-            resolve();
-          }).on('error', (err) => {
-            if (err.code === 'EADDRINUSE') {
-              console.log(`Port ${port} is in use, trying next port...`);
-              server.close();
-              reject(err);
-            } else {
-              reject(err);
-            }
-          });
-        });
-        // If we get here, the server started successfully
-        return;
-      } catch (error) {
-        if (port === alternativePorts[alternativePorts.length - 1]) {
-          throw new Error('All ports are in use');
-        }
-        // Continue to next port
-        continue;
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+      console.log(`WebSocket server is ready`);
+    }).on('error', (err) => {
+      console.error('Failed to start server:', err);
+      if (retryCount < maxRetries) {
+        console.log(`Retrying in 5 seconds... (Attempt ${retryCount + 1} of ${maxRetries})`);
+        setTimeout(() => startServer(retryCount + 1), 5000);
+      } else {
+        console.error('Max retries reached. Could not start server.');
+        process.exit(1);
       }
-    }
+    });
   } catch (error) {
     console.error('Failed to start server:', error);
     if (retryCount < maxRetries) {
       console.log(`Retrying in 5 seconds... (Attempt ${retryCount + 1} of ${maxRetries})`);
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      return startServer(retryCount + 1);
+      setTimeout(() => startServer(retryCount + 1), 5000);
     } else {
       console.error('Max retries reached. Could not start server.');
       process.exit(1);

@@ -4,6 +4,7 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { AlertCircle, Loader } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 
 interface ForgotPasswordInputs {
   email: string;
@@ -24,7 +25,7 @@ const ForgotPasswordPage = () => {
     setIsSubmitting(true);
     
     try {
-      await axios.post('http://localhost:5000/api/auth/forgot-password', {
+      await axios.post(`${API_BASE_URL}/auth/forgot-password`, {
         email: data.email
       });
       

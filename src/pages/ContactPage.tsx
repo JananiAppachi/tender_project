@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { MapPin, Phone, Mail, Send } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 
 const ContactPage = () => {
   const { toast } = useToast();
@@ -27,7 +28,7 @@ const ContactPage = () => {
     setIsSubmitting(true);
 
     try {
-      await axios.post('http://localhost:5000/api/contact', formData);
+      await axios.post(`${API_BASE_URL}/contact`, formData);
 
       toast({
         title: 'Message Sent',

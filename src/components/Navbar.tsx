@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, User, LogOut, Settings, ChevronDown } from 'lucide-react';
 import Logo from './Logo';
 import { useAuth } from '../contexts/AuthContext';
+import { API_BASE_URL } from '../config/api';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -75,7 +76,7 @@ const Navbar = () => {
 
   const getProfileImageUrl = (imagePath: string | null) => {
     if (!imagePath) return undefined;
-    return imagePath.startsWith('http') ? imagePath : `http://localhost:5000${imagePath}`;
+    return imagePath.startsWith('http') ? imagePath : `${API_BASE_URL}${imagePath}`;
   };
 
   if (isLoading) {

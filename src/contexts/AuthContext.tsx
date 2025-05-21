@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 
 interface User {
   _id: string;
@@ -39,7 +40,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (token) {
         try {
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          const { data } = await axios.get('http://localhost:5000/api/auth/me');
+          const { data } = await axios.get(`${API_BASE_URL}/auth/me`);
           setUser(data);
         } catch (error) {
           console.error('Failed to fetch user data:', error);
@@ -56,7 +57,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     try {
-      const { data } = await axios.post('http://localhost:5000/api/auth/login', { email, password });
+      const { data } = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
       setToken(data.token);
       setUser(data.user);
       localStorage.setItem('token', data.token);
@@ -68,7 +69,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const register = async (formData: FormData) => {
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/register', formData, {
+      const response = await axios.post(`${API_BASE_URL}/auth/register`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }

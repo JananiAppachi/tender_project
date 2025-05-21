@@ -4,6 +4,7 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { AlertCircle, Loader } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 
 interface ResetPasswordInputs {
   newPassword: string;
@@ -41,7 +42,7 @@ const ResetPasswordPage = () => {
         throw new Error('Reset token is missing');
       }
 
-      await axios.post('http://localhost:5000/api/auth/reset-password', {
+      await axios.post(`${API_BASE_URL}/auth/reset-password`, {
         token,
         newPassword: data.newPassword
       });
