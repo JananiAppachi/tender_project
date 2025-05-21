@@ -142,24 +142,16 @@ wss.on('close', () => {
 // Middleware
 app.use(express.json());
 app.use(cors({
-<<<<<<< HEAD
   origin: [
-=======
- origin: [
->>>>>>> ec6b288e1d63ff16e1161bf25e51c5f6ba39cf57
     'http://localhost:5173', 
     'http://localhost:5174', 
     'ws://localhost:5173', 
     'ws://localhost:5174', 
     'http://localhost:5000',
-<<<<<<< HEAD
     'https://dhiya-frontend.vercel.app',
     'https://dhiya-frontend.vercel.app/',
     'https://*.vercel.app'
   ],
-=======
-    'https://dhiya-frontend.vercel.app'],
->>>>>>> ec6b288e1d63ff16e1161bf25e51c5f6ba39cf57
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
@@ -223,8 +215,9 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Root health check
 app.get('/health', (req, res) => {
-  console.log('Health check requested from:', req.headers.origin);
+  console.log('Root health check requested from:', req.headers.origin);
   res.status(200).json({ 
     status: 'ok',
     mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
@@ -232,7 +225,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Add a root route for testing
+// Root route
 app.get('/', (req, res) => {
   console.log('Root route accessed from:', req.headers.origin);
   res.status(200).json({ 
