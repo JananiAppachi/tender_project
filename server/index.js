@@ -139,34 +139,6 @@ wss.on('close', () => {
   clearInterval(pingInterval);
 });
 
-// Health check routes (place these BEFORE other middleware)
-app.get('/health', (req, res) => {
-  console.log('Root health check requested from:', req.headers.origin);
-  res.status(200).json({ 
-    status: 'ok',
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    timestamp: new Date().toISOString()
-  });
-});
-
-app.get('/api/health', (req, res) => {
-  console.log('API health check requested from:', req.headers.origin);
-  res.status(200).json({ 
-    status: 'ok',
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Root route
-app.get('/', (req, res) => {
-  console.log('Root route accessed from:', req.headers.origin);
-  res.status(200).json({ 
-    message: 'Server is running',
-    timestamp: new Date().toISOString()
-  });
-});
-
 // Middleware
 app.use(express.json());
 
@@ -184,6 +156,7 @@ const corsOptions = {
       'https://dhiya-frontend.vercel.app',
       'https://dhiya-frontend.vercel.app/',
       // Preview deployment URLs
+      'https://dhiya-frontend-8kw2fs9nw-jananis-projects-e76bb261.vercel.app',
       'https://dhiya-frontend-a1wcym8u4-jananis-projects-e76bb261.vercel.app',
       'https://dhiya-frontend-jh0vkuf43-jananis-projects-e76bb261.vercel.app'
     ];
@@ -211,6 +184,38 @@ app.use(cors(corsOptions));
 
 // Handle preflight requests
 app.options('*', cors(corsOptions));
+
+// Health check routes (place these BEFORE other middleware)
+app.get('/health', (req, res) => {
+  console.log('Root health check requested from:', req.headers.origin);
+  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.status(200).json({ 
+    status: 'ok',
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/api/health', (req, res) => {
+  console.log('API health check requested from:', req.headers.origin);
+  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.status(200).json({ 
+    status: 'ok',
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Root route
+app.get('/', (req, res) => {
+  console.log('Root route accessed from:', req.headers.origin);
+  res.status(200).json({ 
+    message: 'Server is running',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

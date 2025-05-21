@@ -8,12 +8,22 @@ export { API_BASE_URL, WS_BASE_URL };
 export const checkServerConnection = async () => {
   try {
     console.log('Checking server connection at:', API_BASE_URL);
-    const response = await fetch(`${API_BASE_URL.replace('/api', '')}/health`);
+    const response = await fetch(`${API_BASE_URL.replace('/api', '')}/health`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+    
     if (!response.ok) {
       console.error('Server health check failed:', response.status, response.statusText);
       throw new Error('Server is not responding properly');
     }
-    console.log('Server connection successful');
+    
+    const data = await response.json();
+    console.log('Server connection successful:', data);
     return true;
   } catch (error) {
     console.error('Server connection error:', error);
