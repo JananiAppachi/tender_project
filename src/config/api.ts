@@ -8,7 +8,7 @@ export { API_BASE_URL, WS_BASE_URL };
 export const checkServerConnection = async () => {
   try {
     console.log('Checking server connection at:', API_BASE_URL);
-    const response = await fetch(`${API_BASE_URL}/health`);
+    const response = await fetch(`${API_BASE_URL.replace('/api', '')}/health`);
     if (!response.ok) {
       console.error('Server health check failed:', response.status, response.statusText);
       throw new Error('Server is not responding properly');
