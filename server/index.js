@@ -142,16 +142,24 @@ wss.on('close', () => {
 // Middleware
 app.use(express.json());
 app.use(cors({
+<<<<<<< HEAD
   origin: [
+=======
+ origin: [
+>>>>>>> ec6b288e1d63ff16e1161bf25e51c5f6ba39cf57
     'http://localhost:5173', 
     'http://localhost:5174', 
     'ws://localhost:5173', 
     'ws://localhost:5174', 
     'http://localhost:5000',
+<<<<<<< HEAD
     'https://dhiya-frontend.vercel.app',
     'https://dhiya-frontend.vercel.app/',
     'https://*.vercel.app'
   ],
+=======
+    'https://dhiya-frontend.vercel.app'],
+>>>>>>> ec6b288e1d63ff16e1161bf25e51c5f6ba39cf57
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
