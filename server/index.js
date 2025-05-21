@@ -139,6 +139,34 @@ wss.on('close', () => {
   clearInterval(pingInterval);
 });
 
+// Health check routes (place these BEFORE other middleware)
+app.get('/health', (req, res) => {
+  console.log('Root health check requested from:', req.headers.origin);
+  res.status(200).json({ 
+    status: 'ok',
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/api/health', (req, res) => {
+  console.log('API health check requested from:', req.headers.origin);
+  res.status(200).json({ 
+    status: 'ok',
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Root route
+app.get('/', (req, res) => {
+  console.log('Root route accessed from:', req.headers.origin);
+  res.status(200).json({ 
+    message: 'Server is running',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Middleware
 app.use(express.json());
 app.use(cors({
@@ -204,35 +232,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/tender-requests', tenderRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/contact', contactRoutes);
-
-// Health check routes (both /api/health and /health)
-app.get('/api/health', (req, res) => {
-  console.log('Health check requested from:', req.headers.origin);
-  res.status(200).json({ 
-    status: 'ok',
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Root health check
-app.get('/health', (req, res) => {
-  console.log('Root health check requested from:', req.headers.origin);
-  res.status(200).json({ 
-    status: 'ok',
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Root route
-app.get('/', (req, res) => {
-  console.log('Root route accessed from:', req.headers.origin);
-  res.status(200).json({ 
-    message: 'Server is running',
-    timestamp: new Date().toISOString()
-  });
-});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
